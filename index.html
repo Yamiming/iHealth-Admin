@@ -1,0 +1,208 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iHEALTH Admin Portal</title>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyB25bg3MSku1WlLfxsAFq9w9IycaKg1Vlo",
+      authDomain: "ihealth-lab.firebaseapp.com",
+      projectId: "ihealth-lab",
+      storageBucket: "ihealth-lab.firebasestorage.app",
+      messagingSenderId: "77438226476",
+      appId: "1:77438226476:web:2acbbf70ff480a3d4e4189"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+  </script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      width: 100%;
+      max-width: 800px;
+      margin: 40px auto;
+    }
+    .login-container, .dashboard {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+    }
+    h2 {
+      text-align: center;
+      color: #157F97;
+      margin-bottom: 20px;
+    }
+    input, textarea, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 1rem;
+    }
+    button {
+      background-color: #74C69D;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background-color: #66b38a;
+    }
+    .news-list {
+      margin-top: 30px;
+    }
+    .news-item {
+      background: #ffffff;
+      border: 1px solid #ddd;
+      border-left: 6px solid #157F97;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      position: relative;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .news-item h4 {
+      margin-top: 0;
+      color: #157F97;
+    }
+    .news-item p {
+      color: #333;
+      line-height: 1.5;
+    }
+    .delete-btn {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: #C04065;
+      color: white;
+      border: none;
+      padding: 6px 10px;
+      font-size: 0.9rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .tools {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="login-container" id="login">
+      <h2>Admin Login</h2>
+      <input type="password" id="password" placeholder="Enter admin password" />
+      <button onclick="login()">Login</button>
+    </div>
+
+    <div class="dashboard" id="dashboard" style="display:none">
+      <h2>Post News</h2>
+      <input type="text" id="newsTitle" placeholder="Title" />
+      <input type="date" id="newsDate" />
+      <textarea id="newsContent" placeholder="News content..." rows="4"></textarea>
+      <button onclick="addNews()">Publish</button>
+      <div class="tools">
+        <button onclick="exportNews()" style="background:#157F97; margin-top:10px;">Export as JSON</button>
+      </div>
+      <div class="news-list" id="newsList"></div>
+    </div>
+  </div>
+
+  <script>
+    const PASSWORD = "iheal123";
+
+    function login() {
+      const input = document.getElementById('password').value;
+      if (input === PASSWORD) {
+        document.getElementById('login').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        loadNews();
+      } else {
+        alert("Incorrect password.");
+      }
+    }
+
+    async function addNews() {
+      const title = document.getElementById('newsTitle').value;
+      const date = document.getElementById('newsDate').value;
+      const content = document.getElementById('newsContent').value;
+
+      if (!title || !date || !content) {
+        alert("Please fill in all fields.");
+        return;
+      }
+
+      try {
+        await db.collection("news").add({
+          title,
+          date,
+          content,
+          timestamp: new Date()
+        });
+        alert("News published!");
+        document.getElementById('newsTitle').value = "";
+        document.getElementById('newsDate').value = "";
+        document.getElementById('newsContent').value = "";
+        loadNews();
+      } catch (error) {
+        console.error("Error publishing news:", error);
+        alert("Failed to publish news. Check the browser console for details.");
+      }
+    }
+
+    async function loadNews() {
+      const newsList = document.getElementById('newsList');
+      newsList.innerHTML = '';
+      const snapshot = await db.collection("news").orderBy("timestamp", "desc").get();
+
+      snapshot.forEach((doc) => {
+        const news = doc.data();
+        const newsItem = document.createElement('div');
+        newsItem.classList.add('news-item');
+        newsItem.innerHTML = `
+          <h4>${news.date} — ${news.title}</h4>
+          <p>${news.content}</p>
+          <button class="delete-btn" onclick="deleteNews('${doc.id}')">Delete</button>
+        `;
+        newsList.appendChild(newsItem);
+      });
+    }
+
+    async function deleteNews(docId) {
+      if (!confirm("Are you sure you want to delete this news item?")) return;
+      await db.collection("news").doc(docId).delete();
+      loadNews();
+    }
+
+    async function exportNews() {
+      const snapshot = await db.collection("news").orderBy("timestamp", "desc").get();
+      const newsArray = snapshot.docs.map(doc => doc.data());
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(newsArray, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "ihealth_news_backup.json");
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+  </script>
+</body>
+</html>
